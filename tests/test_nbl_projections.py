@@ -70,6 +70,34 @@ def test_pace_adj_reflects_own_team_possessions_not_opponents():
     assert round(adj, 4) == round(a_avg / league_avg, 4)
 
 
+def test_pace_adj_averages_not_sums_a_teams_doubleheader_round():
+    # D plays twice in round 1 (a real NBL scheduling pattern) at a normal
+    # ~90-possession pace each time, then once in round 2. If the round-2
+    # team the model is asking about (E) is compared against a league_avg
+    # that summed D's two round-1 games into one inflated ~180 entry, D's
+    # doubleheader round would count double-weight and drag league_avg up,
+    # so this would fail if pace_adj regressed back to .sum().
+    doubleheader_box = pd.DataFrame([
+        {"match_id": "d1", "season": 2026, "round_number": "1", "name": "D",
+         "field_goals_attempted": 80, "free_throws_attempted": 20, "rebounds_offensive": 10, "turnovers": 12},
+        {"match_id": "d1", "season": 2026, "round_number": "1", "name": "X",
+         "field_goals_attempted": 80, "free_throws_attempted": 20, "rebounds_offensive": 10, "turnovers": 12},
+        {"match_id": "d2", "season": 2026, "round_number": "1", "name": "D",
+         "field_goals_attempted": 80, "free_throws_attempted": 20, "rebounds_offensive": 10, "turnovers": 12},
+        {"match_id": "d2", "season": 2026, "round_number": "1", "name": "Y",
+         "field_goals_attempted": 80, "free_throws_attempted": 20, "rebounds_offensive": 10, "turnovers": 12},
+        {"match_id": "d3", "season": 2026, "round_number": "2", "name": "E",
+         "field_goals_attempted": 80, "free_throws_attempted": 20, "rebounds_offensive": 10, "turnovers": 12},
+        {"match_id": "d3", "season": 2026, "round_number": "2", "name": "Z",
+         "field_goals_attempted": 80, "free_throws_attempted": 20, "rebounds_offensive": 10, "turnovers": 12},
+    ])
+    # Every team plays at the identical pace (90.8 possessions/game), so a
+    # correct league_avg is also 90.8 regardless of who played how many
+    # games in a round, and every team's pace_adj should come out to 1.0.
+    adj = NP.pace_adj(doubleheader_box, team="E", season=2026, round_number=3)
+    assert round(adj, 4) == 1.0
+
+
 def test_project_combines_all_factors():
     proj = NP.project(
         PLAYER_BOX, TEAM_BOX,

@@ -99,7 +99,12 @@ def pace_adj(team_box: pd.DataFrame, team: str, season: int, round_number: int) 
         return 1.0
     team_avg = team_hist["_poss"].mean()
 
-    per_team_round = hist.groupby(["name", "round_number"])["_poss"].sum()
+    # .mean(), not .sum(): NBL sometimes schedules a team twice in the same
+    # round (a real doubleheader, unlike NFL's one-game-per-team-per-week),
+    # so summing would silently double-count those rounds' possessions and
+    # inflate league_avg — confirmed via backtest (combined_adj was
+    # averaging ~0.46 instead of ~1.0 before this fix).
+    per_team_round = hist.groupby(["name", "round_number"])["_poss"].mean()
     league_avg = per_team_round.groupby(level=1).mean().mean() if not per_team_round.empty else team_avg
 
     if not league_avg:
@@ -123,7 +128,8 @@ def opponent_adj(team_box: pd.DataFrame, opponent: str, stat: str, season: int, 
         return 1.0
     opp_avg = opp_allowed[allowed_col].mean()
 
-    league_allowed = merged.groupby(["name", "round_number"])[allowed_col].sum()
+    # Same doubleheader fix as pace_adj: .mean() per (team, round), not .sum().
+    league_allowed = merged.groupby(["name", "round_number"])[allowed_col].mean()
     league_avg = league_allowed.groupby(level=1).mean().mean() if not league_allowed.empty else opp_avg
 
     if not league_avg:

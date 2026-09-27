@@ -237,6 +237,54 @@ NP.project(player, team, player_full_name="Bryce Cotton", team="Perth Wildcats",
 Odds fetching, edge computation, and pick logging for NBL aren't built
 yet — that's the second half, waiting on `basketball_nbl` odds to appear.
 
+### Validation: does the model actually work?
+
+`scripts/backtest_nbl_model.py` walk-forward tests the model exactly the
+way it'd run live: holds out a full season, and for every round computes
+each player's projection using ONLY rounds strictly before it (no
+lookahead — this falls out of the same round-boundary logic the live
+model uses), then compares to what actually happened. Same idea as the
+NFL side's "0.48-0.56 correlation" validation.
+
+```bash
+python scripts/backtest_nbl_model.py --season 2025   # or 2024, 2023, ...
+```
+
+**A real bug was caught by this process, not invented for it.** The
+first run showed the full model's projections centered at ~46% of the
+raw trailing average instead of ~100% — `pace_adj`/`opponent_adj` grouped
+by `(team, round_number)` and used `.sum()`, silently assuming at most one
+game per team per round. True for NFL weeks, **false for NBL** — some
+rounds are real doubleheaders, and summing two games into one round
+double-counted them, inflating the league-average denominator and
+systematically deflating every projection. Fixed by grouping with
+`.mean()` instead (mathematically identical for NFL's one-game case,
+correct for NBL's). Both factors now correctly center at ~1.00 across the
+league, verified directly, and a regression test
+(`test_pace_adj_averages_not_sums_a_teams_doubleheader_round`) checks this
+holds going forward — confirmed it would have caught the original bug by
+reverting the fix and watching it fail.
+
+**Result, walk-forward across three complete seasons (2023, 2024, 2025):**
+
+| Stat | corr(full model) | corr(raw trailing-3 alone) |
+|---|---|---|
+| points | 0.69 – 0.70 | 0.69 – 0.70 |
+| rebounds | 0.61 – 0.66 | 0.62 – 0.65 |
+| assists | 0.66 – 0.68 | 0.66 – 0.68 |
+| three_pointers_made | 0.45 – 0.51 | 0.45 – 0.51 |
+
+The trailing-3-game average has real, consistent predictive power —
+stronger than the NFL side's validated 0.48-0.56, actually. But
+`OpponentAdj` and `PaceAdj` are now honestly neutral: they neither
+meaningfully help nor hurt the correlation (differences are ≤0.01 across
+every stat and season, noise-level). **The signal is real; the two
+adjustment factors aren't currently adding anything on top of it.** That's
+a legitimate finding to sit with before wiring this into live picks —
+options are to simplify the NBL model down to trailing-average-only, try
+different adjustment formulations, or gather more seasons of data before
+judging them. Not decided yet; flagging it rather than picking one.
+
 ## Guardrails
 
 - Paper trading only — nothing here places real bets or touches a real
