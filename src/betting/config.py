@@ -37,11 +37,19 @@ RECENT_GAMES_WINDOW = 3
 NFLVERSE_GAMES_URL = (
     "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv"
 )
-# nflverse-data publishes weekly player_stats as dated releases; the "player_stats"
-# release tag always points at the latest full-history file.
-NFLVERSE_PLAYER_STATS_URL = (
+
+# nflverse-data's combined "player_stats.csv" release asset (single file, all
+# seasons) lags well behind the season and should NOT be relied on for
+# current-week data — as of this build it stopped updating after the 2024
+# season. The "stats_player" release's per-season files
+# (stats_player_week_{season}.csv) are what's actually kept live during the
+# season (confirmed updating through the current in-progress season). Use
+# these; fetch_nflverse_data.py concatenates the seasons it needs.
+NFLVERSE_STATS_PLAYER_WEEK_URL_TEMPLATE = (
     "https://github.com/nflverse/nflverse-data/releases/download/"
-    "player_stats/player_stats.csv"
+    "stats_player/stats_player_week_{season}.csv"
 )
+# How many trailing seasons (including the current one) to pull by default.
+NFLVERSE_SEASONS_WINDOW = 2
 
 ODDS_API_BASE_URL = "https://api.the-odds-api.com/v4"

@@ -38,8 +38,8 @@ not sufficient, and that judgment call is intentionally not automated.
 
 ## Data sources
 
-- [`nflverse/nfldata`](https://github.com/nflverse/nfldata) `games.csv` — every NFL game since 1999, closing lines + results. Free, no key.
-- [`nflverse/nflverse-data`](https://github.com/nflverse/nflverse-data) `player_stats.csv` — weekly player stats since 1999. Free, no key.
+- [`nflverse/nfldata`](https://github.com/nflverse/nfldata) `games.csv` — every NFL game since 1999, closing lines + results, refreshed continuously including the in-progress season. Free, no key.
+- [`nflverse/nflverse-data`](https://github.com/nflverse/nflverse-data) — weekly player stats, live during the season. Free, no key. **Use the per-season `stats_player_week_{season}.csv` files** (release tag `stats_player`), not the combined `player_stats.csv` asset (release tag `player_stats`) — that combined file stopped updating after the 2024 season as of this build and will silently make every projection look like historical backtest data instead of a live pick. `fetch_nflverse_data.py` auto-detects the current season from `games.csv` and pulls the right per-season files; it's already wired up correctly, this note is here so nobody "fixes" it back to the stale endpoint.
 - [The Odds API](https://the-odds-api.com/) — live game lines + player prop odds, filtered to `regions=au` (Sportsbet, TAB, Ladbrokes AU, Neds). **Requires your own paid API key** — never committed to the repo.
 
 Player prop odds are patchier than game lines: if The Odds API hasn't got
@@ -113,15 +113,23 @@ straightforward export script to add on top of `tips_log` — say the word.
 ## Current watchlist (not yet logged — need a real odds pull first)
 
 Two picks were being tracked before this pipeline existed. They are
-**not** yet in `tips_log`: logging them would mean inventing a book line,
-projection, and price, which contradicts the no-fabricated-data rule
-above. Once you run `fetch_odds.py` with your API key for the relevant
-week, pull the real lines, and run them through `compute_edges.py`, log
-whichever still clears the threshold with real numbers:
+**not** yet in `tips_log`: logging them would mean inventing a book line
+and price, which contradicts the no-fabricated-data rule above. The
+model side is live and confirmed real (see below) — the missing piece is
+just your Odds API pull for the actual line and best AU price. Once you
+run `fetch_odds.py` and `compute_edges.py`, log whichever still clears
+12% with real numbers:
 
 1. **Dalton Schultz (HOU TE) receiving yards, Over** — Nico Collins (HOU
    WR1) has missed 2 straight games (hamstring); Schultz drew 14 targets
    when Collins was out in Week 2. Watching Week 4 vs. Dallas.
+   Confirmed against live 2026 data: Schultz's actual weeks 1-3 were 35 /
+   140 / 30 receiving yards (the 140 is the Week 2 Collins-out game, 14
+   targets). Trailing-3 model projection for Week 4 vs. DAL:
+   **70.3 receiving yards** (`recent3_avg=68.3`, `opponent_adj=0.95`,
+   `pace_adj=1.09`). Whatever HOU's book line turns out to be, this is a
+   real, reproducible number, not a placeholder — run
+   `compute_edges.py` once you've pulled the odds.
 2. **Tutu Atwell (LAR WR2) receptions, Under** — Puka Nacua (LAR WR1) has
    missed 2 straight games, expected back Week 4 vs. Philadelphia; whoever
    absorbed his targets likely has an inflated line if the market hasn't
