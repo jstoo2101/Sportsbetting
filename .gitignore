@@ -1,0 +1,15 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Raw nflverse pulls are large and reproducible from source — don't version them.
+data/nflverse/*
+!data/nflverse/.gitkeep
+
+# Cached odds API responses (regenerated each pull, useful locally, not for git history).
+data/odds_cache/
+
+# The database itself IS versioned (see data/db/README.md) — do not ignore betting.db.
