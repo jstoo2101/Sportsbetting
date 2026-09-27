@@ -1,8 +1,11 @@
-# NFL Betting System — Odds Integration & Paper-Trading Pipeline
+# Multi-Sport Betting System — Odds Integration & Paper-Trading Pipeline
 
-Paper-trading research project: project NFL player prop values, compare
+Paper-trading research project: project player prop values, compare
 against real Australian bookmaker lines, and build an evidence-backed,
 immutable track record before any subscription product is considered.
+NFL is the first, fully-built sport; NBL (Australian basketball) is next,
+with its stats/projection half built and its odds half waiting on The
+Odds API to activate the sport for the season (see NBL section below).
 
 **No real money is wagered anywhere in this system.** Every pick is
 hypothetical, logged with timestamps, for evidence-gathering only.
@@ -145,6 +148,94 @@ run `fetch_odds.py` and `compute_edges.py`, log whichever still clears
    missed 2 straight games, expected back Week 4 vs. Philadelphia; whoever
    absorbed his targets likely has an inflated line if the market hasn't
    repriced for his return.
+
+## NBL (Australian basketball) — in progress
+
+**Status: stats + projection model built and verified against live data.
+Odds integration is not built yet — blocked on The Odds API, not on us.**
+
+### Why NBL, and why odds are on hold
+
+The Odds API lists `basketball_nbl` as a supported sport, but as of this
+build it's returning zero events/odds even though the NBL27 season started
+2026-09-19 and rounds 1-2 have already been played — confirmed independently
+(you checked Sportsbet directly: no NBL markets live right now, despite
+having bet on NBL games in the days prior). This reads as a normal
+early-season odds-market lull rather than a real gap, so the plan is to
+build the half that doesn't depend on it (stats + projections) now, and
+re-check `basketball_nbl` periodically until markets reappear — not to
+pay for a worse alternative. The one legitimate alternative investigated
+(BetsAPI) is Bet365-sourced — a single bookmaker, not a multi-book AU
+comparison — so it doesn't serve the "best price across AU books" goal
+this system is built around, and scraping bookmaker sites directly is
+off the table per the guardrails below.
+
+### Data source
+
+[`JaseZiv/nblr_data`](https://github.com/JaseZiv/nblr_data) — a free,
+open (GPL-3), community-maintained companion data repo to the `nblR` R
+package. Same "GitHub release assets" pattern as nflverse, just `.rds`
+(R-serialized) instead of `.csv`; `fetch_nbl_data.py` reads it with
+`pyreadr` (no R install needed) and writes plain CSVs downstream code
+reads like any other pandas source. Confirmed live and current — includes
+the in-progress 2026-2027 season. Player box scores (points, rebounds,
+assists, 3PM, minutes) go back to 2015-16; match results to 1979.
+
+Two real data-quality issues were found and are patched in
+`fetch_nbl_data.py`, not worked around downstream:
+- `team_box`'s `points` column is 100% null for the 2025 and 2026 seasons
+  (an upstream provider/schema change) — `score` holds the same value in
+  every season including the broken ones (verified identical wherever
+  both are populated), so it's used to patch the gap.
+- Within the *same* 2026 season, "New Zealand Breakers" is used
+  inconsistently — their own box-score rows say `NZ Breakers`, but every
+  other team's `opp_name` reference to them says `New Zealand Breakers`.
+  Left alone this silently fragments their trailing history mid-season;
+  `TEAM_NAME_ALIASES` canonicalizes it before anything downstream sees it.
+
+### Projection model (v1)
+
+```
+Proj = Recent3GameAvg x OpponentAdj x PaceAdj x RoleAdj
+```
+
+No `WeatherAdj` — NBL is played indoors. `OpponentAdj` and `PaceAdj` are
+computed from **team** box scores, not player rows: in `team_box.csv`
+every match has exactly two rows (one per team), so "what team X allows"
+is literally the other row's own total for that match — a same-`match_id`
+self-join, not a position-based estimate. That sidesteps `playing_position`
+entirely, whose values are inconsistent junk across seasons/data-provider
+eras (`G`, `GRD`, `Guard`, `PG/SG`, ...). `PaceAdj` uses the standard
+basketball estimated-possessions formula (`FGA + 0.44*FTA - OREB + TOV`)
+on the team's own box score, same idea as the NFL model's plays-per-game.
+
+Verified against real Round 3 fixtures: Bryce Cotton (Perth Wildcats) vs.
+South East Melbourne Phoenix (his actual next opponent) projects at 23.1
+points / 1.5 rebounds / 5.1 assists / 3.9 threes off a real 33.0
+points-per-game start through 2 rounds. `games_used` is correctly capped
+at 2 this early — the same games-used gate built for NFL (see above)
+applies identically here once NBL picks get wired into `edges.py`, so
+nothing gets flagged until a player has a real 3-round trailing window.
+
+### Pipeline (stats half only, for now)
+
+```bash
+python scripts/fetch_nbl_data.py   # writes data/nbl/player_box.csv, team_box.csv
+```
+
+```python
+import pandas as pd
+from betting import nbl_projections as NP
+
+player = pd.read_csv("data/nbl/player_box.csv", low_memory=False)
+team = pd.read_csv("data/nbl/team_box.csv", low_memory=False)
+
+NP.project(player, team, player_full_name="Bryce Cotton", team="Perth Wildcats",
+           opponent="South East Melbourne Phoenix", stat="points", season=2026, round_number=3)
+```
+
+Odds fetching, edge computation, and pick logging for NBL aren't built
+yet — that's the second half, waiting on `basketball_nbl` odds to appear.
 
 ## Guardrails
 

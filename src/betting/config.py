@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = REPO_ROOT / "data"
 NFLVERSE_DIR = DATA_DIR / "nflverse"
+NBL_DIR = DATA_DIR / "nbl"
 ODDS_CACHE_DIR = DATA_DIR / "odds_cache"
 DB_PATH = DATA_DIR / "db" / "betting.db"
 
@@ -53,3 +54,13 @@ NFLVERSE_STATS_PLAYER_WEEK_URL_TEMPLATE = (
 NFLVERSE_SEASONS_WINDOW = 2
 
 ODDS_API_BASE_URL = "https://api.the-odds-api.com/v4"
+
+# NBL data: JaseZiv/nblr_data is a free, open (GPL-3), community-maintained
+# companion data repo to the nblR R package — same "GitHub release assets"
+# pattern as nflverse, just .rds (R serialized) instead of .csv. Confirmed
+# live and current: includes the 2026-2027 season, which started 2026-09-19.
+# No key needed. Player box scores go back to 2015-16; match results to 1979.
+NBL_DATA_RELEASE_BASE_URL = "https://github.com/JaseZiv/nblr_data/releases/download"
+NBL_BOX_PLAYER_URL = f"{NBL_DATA_RELEASE_BASE_URL}/box_player/box_player.rds"
+NBL_BOX_TEAM_URL = f"{NBL_DATA_RELEASE_BASE_URL}/box_team/box_team.rds"
+NBL_RESULTS_WIDE_URL = f"{NBL_DATA_RELEASE_BASE_URL}/match_results/results_wide.rds"

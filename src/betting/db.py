@@ -16,7 +16,8 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS odds_snapshots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     pulled_at TEXT NOT NULL,           -- ISO 8601 UTC, when we hit the API
-    sport_key TEXT NOT NULL,
+    sport TEXT NOT NULL DEFAULT 'NFL', -- our sport label: NFL / NBL / ...
+    sport_key TEXT NOT NULL,           -- the odds provider's sport key, e.g. americanfootball_nfl
     event_id TEXT NOT NULL,
     commence_time TEXT NOT NULL,
     home_team TEXT NOT NULL,
@@ -33,17 +34,18 @@ CREATE TABLE IF NOT EXISTS odds_snapshots (
 CREATE TABLE IF NOT EXISTS projections (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     computed_at TEXT NOT NULL,
-    season INTEGER NOT NULL,
-    week INTEGER NOT NULL,
+    sport TEXT NOT NULL DEFAULT 'NFL',
+    season INTEGER NOT NULL,            -- NBL's "2026-2027" seasons store as the start year, 2026
+    week INTEGER NOT NULL,              -- NFL week, or NBL round_number
     player TEXT NOT NULL,
     team TEXT NOT NULL,
     opponent TEXT NOT NULL,
-    stat TEXT NOT NULL,                 -- rushing_yards / receiving_yards / receptions
+    stat TEXT NOT NULL,                 -- rushing_yards / receiving_yards / receptions / points / rebounds_total / assists / ...
     recent3_avg REAL NOT NULL,
     opponent_adj REAL NOT NULL,
     pace_adj REAL NOT NULL,
     role_adj REAL NOT NULL,
-    weather_adj REAL NOT NULL,
+    weather_adj REAL NOT NULL DEFAULT 1.0,  -- not meaningful indoors (e.g. NBL); left at 1.0
     projection REAL NOT NULL,
     notes TEXT
 );
@@ -51,6 +53,7 @@ CREATE TABLE IF NOT EXISTS projections (
 CREATE TABLE IF NOT EXISTS tips_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     logged_at TEXT NOT NULL,            -- ISO 8601 UTC, immutable once written
+    sport TEXT NOT NULL DEFAULT 'NFL',
     season INTEGER NOT NULL,
     week INTEGER NOT NULL,
     player TEXT NOT NULL,
@@ -85,6 +88,7 @@ CREATE TRIGGER IF NOT EXISTS tips_log_settlement_only
 BEFORE UPDATE ON tips_log
 WHEN
     OLD.logged_at IS NOT NEW.logged_at OR
+    OLD.sport IS NOT NEW.sport OR
     OLD.season IS NOT NEW.season OR
     OLD.week IS NOT NEW.week OR
     OLD.player IS NOT NEW.player OR
@@ -112,10 +116,23 @@ def get_connection(db_path: Path | None = None) -> sqlite3.Connection:
     return conn
 
 
+def _add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, ddl: str) -> None:
+    existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+    if column not in existing:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {ddl}")
+
+
 def init_db(db_path: Path | None = None) -> None:
+    """Creates tables if they don't exist, and migrates older databases
+    (e.g. one committed before multi-sport support existed) in place."""
     conn = get_connection(db_path)
     try:
         conn.executescript(SCHEMA)
+        # A DB created before `sport` existed won't get it from CREATE TABLE
+        # IF NOT EXISTS above — add it explicitly so old NFL-only data still
+        # works once NBL (or any other sport) starts writing to the same file.
+        for table in ("odds_snapshots", "projections", "tips_log"):
+            _add_column_if_missing(conn, table, "sport", "sport TEXT NOT NULL DEFAULT 'NFL'")
         conn.commit()
     finally:
         conn.close()

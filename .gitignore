@@ -5,9 +5,11 @@ __pycache__/
 venv/
 .pytest_cache/
 
-# Raw nflverse pulls are large and reproducible from source — don't version them.
+# Raw pulls are large and reproducible from source — don't version them.
 data/nflverse/*
 !data/nflverse/.gitkeep
+data/nbl/_raw/
+data/nbl/*.csv
 
 # Cached odds API responses (regenerated each pull, useful locally, not for git history).
 data/odds_cache/
