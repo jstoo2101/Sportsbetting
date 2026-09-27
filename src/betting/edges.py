@@ -31,9 +31,27 @@ def compute_edge(projection_value: float, book_line: float, threshold: float = c
     return EdgeResult(edge_pct=edge_pct, side=side, flagged=abs(edge_pct) >= threshold)
 
 
-def evaluate_pick(projection: Projection, book_line: float, odds_by_side: dict[str, dict]) -> dict | None:
+def evaluate_pick(
+    projection: Projection,
+    book_line: float,
+    odds_by_side: dict[str, dict],
+    min_games: int = config.RECENT_GAMES_WINDOW,
+) -> dict | None:
     """Returns a candidate pick dict if the edge crosses the threshold AND a
-    best price exists for the implied side, else None."""
+    best price exists for the implied side, else None.
+
+    Requires a full trailing window (min_games, default RECENT_GAMES_WINDOW)
+    before flagging anything. Early in a season a player may only have 1-2
+    games of history; the model's validated 0.48-0.56 correlation was
+    measured on a full 3-game trailing average, not a thinner one, so a
+    "projection" built from 1-2 games is a different, unvalidated thing —
+    don't silently treat it as equivalent. This also incidentally guards
+    against the edge_pct formula blowing up: thin-sample players tend to be
+    low-usage bench guys with small book lines (0.5 receptions etc.), where
+    a small absolute miss is a huge percentage "edge" that isn't real signal.
+    """
+    if projection.games_used < min_games:
+        return None
     edge = compute_edge(projection.projection, book_line)
     if not edge.flagged:
         return None

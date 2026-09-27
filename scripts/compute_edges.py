@@ -84,6 +84,11 @@ def main() -> None:
 
     pick = edges.evaluate_pick(proj, book_line, odds_by_side)
     if pick is None:
+        if proj.games_used < config.RECENT_GAMES_WINDOW:
+            print(f"No pick: only {proj.games_used} trailing game(s) of history "
+                  f"(need {config.RECENT_GAMES_WINDOW}) — too early in the season "
+                  f"for a validated projection, not flagging regardless of edge size.")
+            return
         edge = edges.compute_edge(proj.projection, book_line)
         print(f"No pick: edge {edge.edge_pct:.1%} does not cross the {config.EDGE_THRESHOLD:.0%} threshold "
               f"(or no price available for the {edge.side} side).")

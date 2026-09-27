@@ -32,9 +32,20 @@ Proj = Recent3GameAvg x OpponentAdj x PaceAdj x RoleAdj x WeatherAdj
 | `WeatherAdj` | **manual**, analyst judgment | passing props only: knock 10-20% off for wind >15mph or heavy outdoor precip (`--weather-adj`) |
 
 A pick is only a candidate when `|edge| = (Proj - BookLine) / BookLine >= 12%`
-(`EDGE_THRESHOLD` in `src/betting/config.py`) **and** the direction agrees
-with an actual matchup/role thesis — the threshold alone is necessary but
-not sufficient, and that judgment call is intentionally not automated.
+(`EDGE_THRESHOLD` in `src/betting/config.py`) **and** a player has a full
+3-game trailing window (`games_used >= RECENT_GAMES_WINDOW`) **and** the
+direction agrees with an actual matchup/role thesis — the threshold alone
+is necessary but not sufficient, and that judgment call is intentionally
+not automated.
+
+The games-used gate exists because early in a season (weeks 1-3) trailing-3
+is really trailing-1 or trailing-2, which is a different, unvalidated thing
+from what the backtest measured — and because the edge-% formula blows up
+on small book lines (a 0.5-reception line for a bench player turns a tiny
+absolute miss into a fake "900% edge"). Confirmed live on the season's
+actual Week 3 DEN @ LA game: every player capped at 2 trailing games and
+the gate correctly returned zero candidates rather than surfacing that
+noise. The earliest any pick can be validly flagged is Week 4.
 
 ## Data sources
 
