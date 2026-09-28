@@ -3,9 +3,11 @@
 Paper-trading research project: project player prop values, compare
 against real Australian bookmaker lines, and build an evidence-backed,
 immutable track record before any subscription product is considered.
-NFL is the first, fully-built sport; NBL (Australian basketball) is next,
-with its stats/projection half built and its odds half waiting on The
-Odds API to activate the sport for the season (see NBL section below).
+NFL is the first, fully-built sport; NBL (Australian basketball) and NBA
+are next, both with their stats/projection half built and validated, and
+their odds half waiting on real markets — NBL's on The Odds API to
+activate the sport for its season, NBA's simply on its 2026-27 season
+starting Oct 20, 2026 (see the NBL and NBA sections below).
 
 **No real money is wagered anywhere in this system.** Every pick is
 hypothetical, logged with timestamps, for evidence-gathering only.
@@ -284,6 +286,95 @@ a legitimate finding to sit with before wiring this into live picks —
 options are to simplify the NBL model down to trailing-average-only, try
 different adjustment formulations, or gather more seasons of data before
 judging them. Not decided yet; flagging it rather than picking one.
+
+## NBA — built ahead of the 2026-27 season (starts Oct 20, 2026)
+
+**Status: stats + projection model built and validated against two real
+seasons. Not the same code as NBL — structurally different data, not a
+copy-paste — but genuinely fast to build the second time.**
+
+### Why it's not just "NBL again"
+
+Same stat categories (points/rebounds/assists/threes), but the actual data
+is a different shape in ways that mattered:
+
+- **No "round" concept.** NBL/NRL-style sports schedule in rounds; the NBA
+  (like NFL) just has games on dates. `nba_projections.py` orders trailing
+  history by real `game_date`/`game_date_time` instead of a round number,
+  which sidesteps the entire doubleheader-round bug class found in the NBL
+  model by construction (a team essentially never plays twice on the same
+  calendar date) — but every aggregation still defensively uses `.mean()`
+  rather than `.sum()` per (team, date), on the principle the NBL bug
+  taught: never assume exactly one row per group unless the source
+  actually guarantees it.
+- **Different, and inconsistent, column names.** `player_box`'s own-team
+  columns don't match `team_box`'s for the same stat (team_box has
+  `team_score`, not `points`; `total_rebounds`, not `rebounds`) — handled
+  via an explicit `STAT_TO_TEAM_COL` mapping rather than assuming names
+  line up.
+- **A real trap in the source data**: the All-Star Game is tagged
+  `season_type == 2`, the *same* code as real regular-season games — not
+  given its own type. Confirmed directly against the live 2026 data (the
+  three fake "teams" involved — `STARS`/`STRIPES`/`WORLD` — all show
+  `season_type == 2` on the actual All-Star Weekend date). Filtering on
+  `season_type` alone would silently pollute every All-Star participant's
+  trailing average with an exhibition-game stat line.
+  `fetch_nba_data.py` excludes those three team codes explicitly.
+- **A handful of garbage rows** (33 of 64,883, "COACH'S DECISION" inactive
+  roster slots with no `athlete_id` or name at all) — dropped at the
+  source.
+
+### Data source
+
+[`sportsdataverse/sportsdataverse-data`](https://github.com/sportsdataverse/sportsdataverse-data)
+— same publishing family as nflverse (the `hoopR` R package's
+`load_nba_player_box()`/`load_nba_team_box()` read from these exact
+release assets). Free, no key, `.rds` via `pyreadr`. ESPN labels a season
+by its *ending* year — the season starting Oct 2026 is "2027", not
+"2026" — `fetch_nba_data.py` computes this from today's date and 404s
+cleanly (with a plain "not available yet" message) until ESPN starts
+publishing it.
+
+### Pipeline (stats half only, for now — same reasoning as NBL)
+
+```bash
+python scripts/fetch_nba_data.py                    # auto-detects season from today's date
+python scripts/fetch_nba_data.py --seasons 2025 2026 # explicit seasons, e.g. for backtesting
+```
+
+### Validation
+
+```bash
+python scripts/backtest_nba_model.py --season 2026   # or 2025
+```
+
+Walk-forward across two complete seasons (2025, "2024-25"; 2026,
+"2025-26"):
+
+| Stat | corr(full model) | corr(raw trailing-3 alone) |
+|---|---|---|
+| points | 0.67 | 0.67 |
+| rebounds | 0.60 – 0.62 | 0.59 – 0.62 |
+| assists | 0.65 – 0.66 | 0.65 – 0.66 |
+| three_point_field_goals_made | 0.47 – 0.48 | 0.47 – 0.48 |
+
+Same pattern as NBL: real, consistent signal in the trailing-3 average,
+and `OpponentAdj`/`PaceAdj` are honestly neutral on top of it (both
+factors were verified to center at ~1.00 league-wide from the start,
+using `.mean()` throughout — the NBL bug was caught and fixed before this
+model was written, not found again here). Spot-checked the backtest's
+(necessarily) hand-optimized aggregation against the real `nba_projections`
+scalar functions directly (0 mismatches across 15 random samples) before
+trusting the results — the naive per-team-per-date version took over 2
+minutes to run and didn't finish; hoisting the shared self-join and
+league-average calculations outside the per-team loop got it under 90
+seconds without changing what it computes.
+
+Odds fetching, edge computation, and pick logging for NBA aren't built
+yet. The Odds API already has `basketball_nba` active with the full
+opening-week schedule loaded (confirmed live) — game lines should just
+work once the season starts; player props are unchecked until closer to
+Oct 20, since coverage typically firms up nearer kickoff.
 
 ## Guardrails
 

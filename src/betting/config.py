@@ -14,6 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = REPO_ROOT / "data"
 NFLVERSE_DIR = DATA_DIR / "nflverse"
 NBL_DIR = DATA_DIR / "nbl"
+NBA_DIR = DATA_DIR / "nba"
 ODDS_CACHE_DIR = DATA_DIR / "odds_cache"
 DB_PATH = DATA_DIR / "db" / "betting.db"
 
@@ -64,3 +65,14 @@ NBL_DATA_RELEASE_BASE_URL = "https://github.com/JaseZiv/nblr_data/releases/downl
 NBL_BOX_PLAYER_URL = f"{NBL_DATA_RELEASE_BASE_URL}/box_player/box_player.rds"
 NBL_BOX_TEAM_URL = f"{NBL_DATA_RELEASE_BASE_URL}/box_team/box_team.rds"
 NBL_RESULTS_WIDE_URL = f"{NBL_DATA_RELEASE_BASE_URL}/match_results/results_wide.rds"
+
+# NBA data: sportsdataverse-data (same publishing family as nflverse — the
+# hoopR package's load_nba_player_box()/load_nba_team_box() read from here).
+# Free, no key. ESPN-sourced, so it labels a season by its ENDING calendar
+# year (the season that starts Oct 2026 and ends June 2027 is "2027").
+# Confirmed live: "2026" (the 2025-26 season) already has real data through
+# June 2026; "2027" doesn't exist yet as of this build (season hasn't
+# started) and 404s cleanly.
+NBA_DATA_RELEASE_BASE_URL = "https://github.com/sportsdataverse/sportsdataverse-data/releases/download"
+NBA_PLAYER_BOX_URL_TEMPLATE = f"{NBA_DATA_RELEASE_BASE_URL}/espn_nba_player_boxscores/player_box_{{season}}.rds"
+NBA_TEAM_BOX_URL_TEMPLATE = f"{NBA_DATA_RELEASE_BASE_URL}/espn_nba_team_boxscores/team_box_{{season}}.rds"

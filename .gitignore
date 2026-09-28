@@ -10,6 +10,8 @@ data/nflverse/*
 !data/nflverse/.gitkeep
 data/nbl/_raw/
 data/nbl/*.csv
+data/nba/_raw/
+data/nba/*.csv
 
 # Cached odds API responses (regenerated each pull, useful locally, not for git history).
 data/odds_cache/
